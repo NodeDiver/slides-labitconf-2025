@@ -1,0 +1,50 @@
+graph TB
+    subgraph "Usuario"
+        U[👤 Usuario]
+    end
+
+    subgraph "Capa de Aplicación"
+        APP[📱 App/Bot/Service]
+        MCP[🤖 MCP Agent<br/>Model Context Protocol]
+    end
+
+    subgraph "NWC Layer"
+        NWC[⚡ NWC Connection<br/>NIP-47]
+        PERMS[🔒 Permisos Granulares<br/>Presupuesto/Tipo/Tiempo]
+    end
+
+    subgraph "Nostr Network"
+        RELAY1[📡 Relay 1]
+        RELAY2[📡 Relay 2]
+        RELAY3[📡 Relay 3]
+    end
+
+    subgraph "Lightning Wallet"
+        WALLET[💰 Wallet Lightning<br/>Alby/Mutiny/Umbrel]
+        NODE[⚡ Lightning Node]
+    end
+
+    subgraph "Lightning Network"
+        LN[🌐 Lightning Network<br/>Canales/Nodos]
+    end
+
+    U -->|Configura permisos| PERMS
+    U -->|Interactúa| APP
+    APP -->|Solicita pago| NWC
+    MCP -->|Automatiza| NWC
+    NWC -->|Evento firmado| RELAY1
+    NWC -->|Evento firmado| RELAY2
+    RELAY1 -.->|Propaga| RELAY3
+    RELAY2 -.->|Propaga| RELAY3
+    WALLET -->|Escucha eventos| RELAY1
+    WALLET -->|Escucha eventos| RELAY2
+    WALLET -->|Valida permisos| PERMS
+    WALLET -->|Ejecuta pago| NODE
+    NODE -->|Pago Lightning| LN
+    LN -->|Destino| APP
+
+    style NWC fill:#4285F4,stroke:#212121,stroke-width:3px,color:#fff
+    style PERMS fill:#FFAB40,stroke:#212121,stroke-width:2px
+    style WALLET fill:#0097A7,stroke:#212121,stroke-width:2px,color:#fff
+    style MCP fill:#78909C,stroke:#212121,stroke-width:2px,color:#fff
+    style LN fill:#EEFF41,stroke:#212121,stroke-width:2px

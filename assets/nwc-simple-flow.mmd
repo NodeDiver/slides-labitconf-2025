@@ -1,0 +1,20 @@
+flowchart LR
+    APP[📱 App]
+    NWC[⚡ NWC<br/>NIP-47]
+    RELAY[📡 Nostr<br/>Relays]
+    WALLET[💰 Wallet]
+    LN[🌐 Lightning<br/>Network]
+
+    APP -->|1. Request payment| NWC
+    NWC -->|2. Signed event| RELAY
+    RELAY -->|3. Event| WALLET
+    WALLET -->|4. Validates| NWC
+    WALLET -->|5. Sends payment| LN
+    LN -->|6. Confirmation| WALLET
+    WALLET -->|7. Response event| RELAY
+    RELAY -->|8. Confirmation| APP
+
+    style NWC fill:#4285F4,stroke:#212121,stroke-width:3px,color:#fff
+    style WALLET fill:#0097A7,stroke:#212121,stroke-width:2px,color:#fff
+    style LN fill:#EEFF41,stroke:#212121,stroke-width:2px
+    style APP fill:#78909C,stroke:#212121,stroke-width:2px,color:#fff
