@@ -27,11 +27,12 @@ COLORS = {
 }
 
 # Mapeo de layouts (basado en análisis del template)
+# IMPORTANTE: Solo usar layouts que tengan placeholders TITLE/BODY
 LAYOUT_MAP = {
-    'cover': 0,      # Cover - Color 01
-    'content': 4,    # TITLE_AND_BODY 2
-    'two-column': 5, # TITLE_AND_TWO_COLUMNS
-    'section': 3,    # SECTION_HEADER
+    'cover': 21,      # TITLE_1 (tiene CENTER_TITLE + SUBTITLE)
+    'content': 12,    # TITLE_AND_BODY 2 (tiene TITLE + BODY placeholders)
+    'two-column': 13, # TITLE_AND_TWO_COLUMNS (tiene TITLE + 2 BODY)
+    'section': 11,    # SECTION_HEADER (tiene TITLE)
 }
 
 
@@ -61,7 +62,7 @@ class SlideParser:
         """Parsea una sección individual de slide"""
         lines = section.strip().split('\n')
         slide_data = {
-            'layout': 4,  # Default: TITLE_AND_BODY 2
+            'layout': 12,  # Default: TITLE_AND_BODY 2 (layout con placeholders)
             'title': '',
             'bullets': [],
             'notes': '',
@@ -78,26 +79,33 @@ class SlideParser:
             # Extraer metadata de comentarios
             if line_stripped.startswith('**Slide'):
                 continue
-            elif line_stripped.startswith('- Layout:'):
+
+            # Usar if en lugar de elif para permitir que Type sobrescriba Layout
+            if line_stripped.startswith('- Layout:'):
                 layout_match = re.search(r'Layout:\s*(\d+)', line_stripped)
                 if layout_match:
                     slide_data['layout'] = int(layout_match.group(1)) - 1  # 0-indexed
-            elif line_stripped.startswith('- Type:'):
-                type_match = re.search(r'Type:\s*(\w+)', line_stripped)
+                continue  # No procesar esta línea como contenido
+
+            if line_stripped.startswith('- Type:'):
+                # Permitir hyphens en el tipo (para 'two-column')
+                type_match = re.search(r'Type:\s*([\w-]+)', line_stripped)
                 if type_match:
                     layout_type = type_match.group(1)
-                    slide_data['layout'] = LAYOUT_MAP.get(layout_type, 4)
+                    # Type tiene prioridad sobre Layout numérico
+                    slide_data['layout'] = LAYOUT_MAP.get(layout_type, 12)
+                continue  # No procesar esta línea como contenido
 
-            # Título (##)
-            elif line_stripped.startswith('##'):
-                slide_data['title'] = line_stripped.lstrip('#').strip()
-
-            # Subtítulos (###) para dos columnas
+            # Subtítulos (###) para dos columnas - DEBE ir ANTES de ##
             elif line_stripped.startswith('###'):
                 current_section = line_stripped.lstrip('#').strip()
                 if 'columns' not in slide_data:
                     slide_data['columns'] = {}
                 slide_data['columns'][current_section] = []
+
+            # Título (##)
+            elif line_stripped.startswith('##'):
+                slide_data['title'] = line_stripped.lstrip('#').strip()
 
             # Bullets
             elif line_stripped.startswith('-') or line_stripped.startswith('•'):
@@ -160,48 +168,53 @@ def create_presentation(slides_data):
 
 
 def _add_bullets(slide, bullets):
-    """Agrega bullets al slide"""
-    # Buscar el placeholder de body
-    for shape in slide.shapes:
-        if shape.has_text_frame and shape != slide.shapes.title:
-            text_frame = shape.text_frame
-            text_frame.clear()  # Limpiar contenido de ejemplo
+    """Agrega bullets al slide usando el placeholder BODY"""
+    # Acceder al placeholder de BODY (índice 1 en TITLE_AND_BODY 2)
+    try:
+        body_placeholder = slide.placeholders[1]
+        text_frame = body_placeholder.text_frame
+        text_frame.clear()  # Limpiar contenido de ejemplo
 
-            for idx, bullet in enumerate(bullets):
-                p = text_frame.paragraphs[0] if idx == 0 else text_frame.add_paragraph()
-                p.text = _clean_markdown(bullet)
-                p.level = 0
-                p.font.size = Pt(24)  # Tamaño legible
-            break
+        for idx, bullet in enumerate(bullets):
+            p = text_frame.paragraphs[0] if idx == 0 else text_frame.add_paragraph()
+            p.text = _clean_markdown(bullet)
+            p.level = 0
+            p.font.size = Pt(20)  # Tamaño legible
+    except (KeyError, IndexError) as e:
+        print(f"⚠️  Warning: No se pudo acceder al placeholder BODY: {e}")
 
 
 def _add_two_column_content(slide, columns_data):
-    """Agrega contenido en dos columnas"""
-    # Buscar placeholders de body (debería haber 2 para layout de dos columnas)
-    body_shapes = [s for s in slide.shapes if s.has_text_frame and s != slide.shapes.title]
+    """Agrega contenido en dos columnas usando placeholders BODY"""
+    # Layout TITLE_AND_TWO_COLUMNS tiene: idx=0 (TITLE), idx=1 (BODY left), idx=2 (BODY right)
+    column_indices = [1, 2]  # Placeholders para las dos columnas
 
     column_idx = 0
     for section_title, bullets in columns_data.items():
-        if column_idx >= len(body_shapes):
+        if column_idx >= len(column_indices):
             break
 
-        text_frame = body_shapes[column_idx].text_frame
-        text_frame.clear()
+        try:
+            body_placeholder = slide.placeholders[column_indices[column_idx]]
+            text_frame = body_placeholder.text_frame
+            text_frame.clear()
 
-        # Agregar subtítulo de la columna
-        p = text_frame.paragraphs[0]
-        p.text = section_title
-        p.font.bold = True
-        p.font.size = Pt(28)
+            # Agregar subtítulo de la columna
+            p = text_frame.paragraphs[0]
+            p.text = section_title
+            p.font.bold = True
+            p.font.size = Pt(24)
 
-        # Agregar bullets
-        for bullet in bullets:
-            p = text_frame.add_paragraph()
-            p.text = _clean_markdown(bullet)
-            p.level = 0
-            p.font.size = Pt(22)
+            # Agregar bullets
+            for bullet in bullets:
+                p = text_frame.add_paragraph()
+                p.text = _clean_markdown(bullet)
+                p.level = 0
+                p.font.size = Pt(18)
 
-        column_idx += 1
+            column_idx += 1
+        except (KeyError, IndexError) as e:
+            print(f"⚠️  Warning: No se pudo acceder al placeholder columna {column_idx}: {e}")
 
 
 def _clean_markdown(text):
